@@ -287,7 +287,13 @@ def register(bot: TeleBot) -> None:
         gemini_translate_to_chinese_handler, commands=["t2zh"], pass_bot=True
     )
     bot.register_message_handler(
+        gemini_translate_to_chinese_handler, regexp="^t2zh:", pass_bot=True
+    )
+    bot.register_message_handler(
         gemini_translate_to_english_handler, commands=["t2eng"], pass_bot=True
+    )
+    bot.register_message_handler(
+        gemini_translate_to_english_handler, regexp="^t2eng:", pass_bot=True
     )
     bot.register_message_handler(
         gemini_photo_handler,
