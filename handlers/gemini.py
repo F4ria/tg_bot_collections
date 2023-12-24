@@ -1,3 +1,4 @@
+from inspect import currentframe
 from os import environ
 import re
 
@@ -43,12 +44,13 @@ def gemini_handler(message: Message, bot: TeleBot) -> None:
     """Gemini : /gemini <question>"""
     m = message.text.strip()
     player = None
+    player_id = str(message.from_user.id)
     # restart will lose all TODO
-    if str(message.from_user.id) not in gemini_player_dict:
+    if player_id not in gemini_player_dict:
         player = make_new_gemini_convo()
-        gemini_player_dict[str(message.from_user.id)] = player
+        gemini_player_dict[player_id] = player
     else:
-        player = gemini_player_dict[str(message.from_user.id)]
+        player = gemini_player_dict[player_id]
     if m.strip() == "clear":
         bot.reply_to(
             message,
@@ -56,6 +58,7 @@ def gemini_handler(message: Message, bot: TeleBot) -> None:
         )
         player.history.clear()
         return
+
     # keep the last 5, every has two ask and answer.
     if len(player.history) > 10:
         player.history = player.history[2:]
