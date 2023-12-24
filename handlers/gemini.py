@@ -82,6 +82,54 @@ translate_to_chinese_prompt = """
 ```
 """
 
+# this prompt copy from https://twitter.com/dotey/status/1737732732149457076
+# great thanks to 宝玉
+translate_to_english_prompt = """
+现在我要写一个将中文翻译成英文科研论文的GPT，请参照以下Prompt制作，注意都用英文生成：
+
+## 角色
+你是一位科研论文审稿员，擅长写作高质量的英文科研论文。请你帮我准确且学术性地将以下中文翻译成英文，风格与英文科研论文保持一致。
+
+## 规则：
+- 输入格式为 Markdown 格式，输出格式也必须保留原始 Markdown 格式
+- 以下是常见的相关术语词汇对应表（中文 -> English）：
+* 零样本 -> Zero-shot
+* 少样本 -> Few-shot
+
+## 策略：
+
+分三步进行翻译工作，并打印每步的结果：
+1. 根据中文内容直译成英文，保持原有格式，不要遗漏任何信息
+2. 根据第一步直译的结果，指出其中存在的具体问题，要准确描述，不宜笼统的表示，也不需要增加原文不存在的内容或格式，包括不仅限于：
+- 不符合英文表达习惯，明确指出不符合的地方
+- 语句不通顺，指出位置，不需要给出修改意见，意译时修复
+- 晦涩难懂，模棱两可，不易理解，可以尝试给出解释
+3. 根据第一步直译的结果和第二步指出的问题，重新进行意译，保证内容的原意的基础上，使其更易于理解，更符合英文科研论文的表达习惯，同时保持原有的格式不变
+
+## 格式
+返回格式如下，"{xxx}"表示占位符：
+
+### 直译
+```
+{直译结果}
+```
+
+***
+
+### 问题
+{直译的具体问题列表}
+
+***
+
+### 意译
+```
+{意译结果}
+```
+
+现在请按照上面的要求从第一行开始翻译以下内容为英文：
+```
+"""
+
 # Global history cache
 gemini_player_dict = {}
 
@@ -200,11 +248,46 @@ def gemini_translate_to_chinese_handler(message: Message, bot: TeleBot) -> None:
         bot.delete_message(reply_message.chat.id, reply_message.message_id)
 
 
+def gemini_translate_to_english_handler(message: Message, bot: TeleBot) -> None:
+    """translate to English with Gemini"""
+    reply_message = bot.reply_to(
+        message,
+        "Generating google gemini answer please wait...",
+    )
+    m = message.text.strip()
+    player = None
+    player_id = f"{message.from_user.id}-{currentframe().f_code.co_name}"
+    if player_id not in gemini_player_dict:
+        player = make_new_gemini_convo()
+        gemini_player_dict[player_id] = player
+    else:
+        player = gemini_player_dict[player_id]
+    player.send_message(f"{translate_to_english_prompt}\n{m}")
+    gemini_reply_text = player.last.text.strip()
+    try:
+        bot.reply_to(
+            message,
+            "Gemini answer:\n" + escape(gemini_reply_text),
+            parse_mode="MarkdownV2",
+        )
+    except:
+        print("wrong markdown format")
+        bot.reply_to(
+            message,
+            "Gemini answer:\n\n" + gemini_reply_text,
+        )
+    finally:
+        bot.delete_message(reply_message.chat.id, reply_message.message_id)
+
+
 def register(bot: TeleBot) -> None:
     bot.register_message_handler(gemini_handler, commands=["gemini"], pass_bot=True)
     bot.register_message_handler(gemini_handler, regexp="^gemini:", pass_bot=True)
     bot.register_message_handler(
         gemini_translate_to_chinese_handler, commands=["t2zh"], pass_bot=True
+    )
+    bot.register_message_handler(
+        gemini_translate_to_english_handler, commands=["t2eng"], pass_bot=True
     )
     bot.register_message_handler(
         gemini_photo_handler,
