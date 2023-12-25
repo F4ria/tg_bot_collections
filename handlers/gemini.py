@@ -230,8 +230,18 @@ def gemini_translate_to_chinese_handler(message: Message, bot: TeleBot) -> None:
         gemini_player_dict[player_id] = player
     else:
         player = gemini_player_dict[player_id]
-    player.send_message(f"{translate_to_chinese_prompt}\n{m}")
-    gemini_reply_text = player.last.text.strip()
+
+    try:
+        player.send_message(f"{translate_to_chinese_prompt}\n{m}")
+        gemini_reply_text = player.last.text.strip()
+    except StopCandidateException as e:
+        match = re.search(r'content\s*{\s*parts\s*{\s*text:\s*"([^"]+)"', str(e))
+        if match:
+            gemini_reply_text = match.group(1)
+            gemini_reply_text = re.sub(r"\\n", "\n", gemini_reply_text)
+        else:
+            raise e
+
     try:
         bot.reply_to(
             message,
@@ -262,8 +272,18 @@ def gemini_translate_to_english_handler(message: Message, bot: TeleBot) -> None:
         gemini_player_dict[player_id] = player
     else:
         player = gemini_player_dict[player_id]
-    player.send_message(f"{translate_to_english_prompt}\n{m}")
-    gemini_reply_text = player.last.text.strip()
+
+    try:
+        player.send_message(f"{translate_to_english_prompt}\n{m}")
+        gemini_reply_text = player.last.text.strip()
+    except StopCandidateException as e:
+        match = re.search(r'content\s*{\s*parts\s*{\s*text:\s*"([^"]+)"', str(e))
+        if match:
+            gemini_reply_text = match.group(1)
+            gemini_reply_text = re.sub(r"\\n", "\n", gemini_reply_text)
+        else:
+            raise e
+
     try:
         bot.reply_to(
             message,
