@@ -148,7 +148,9 @@ def gemini_handler(message: Message, bot: TeleBot) -> None:
     """Gemini : /gemini <question>"""
     m = message.text.strip()
     player = None
-    player_id = str(message.from_user.id)
+    player_id = (
+        f"{message.chat.id}-{message.from_user.id}-{currentframe().f_code.co_name}"
+    )
     # restart will lose all TODO
     if player_id not in gemini_player_dict:
         player = make_new_gemini_convo()
@@ -224,7 +226,9 @@ def gemini_translate_to_chinese_handler(message: Message, bot: TeleBot) -> None:
     )
     m = message.text.strip()
     player = None
-    player_id = f"{message.from_user.id}-{currentframe().f_code.co_name}"
+    player_id = (
+        f"{message.chat.id}-{message.from_user.id}-{currentframe().f_code.co_name}"
+    )
     if player_id not in gemini_player_dict:
         player = make_new_gemini_convo()
         gemini_player_dict[player_id] = player
@@ -266,7 +270,9 @@ def gemini_translate_to_english_handler(message: Message, bot: TeleBot) -> None:
     )
     m = message.text.strip()
     player = None
-    player_id = f"{message.from_user.id}-{currentframe().f_code.co_name}"
+    player_id = (
+        f"{message.chat.id}-{message.from_user.id}-{currentframe().f_code.co_name}"
+    )
     if player_id not in gemini_player_dict:
         player = make_new_gemini_convo()
         gemini_player_dict[player_id] = player
