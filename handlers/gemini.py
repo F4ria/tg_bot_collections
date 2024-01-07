@@ -249,7 +249,7 @@ def gemini_translate_to_chinese_handler(message: Message, bot: TeleBot) -> None:
     try:
         bot.reply_to(
             message,
-            "Gemini answer:\n" + escape(gemini_reply_text),
+            "Gemini answer:\n" + telegramify_markdown.convert(gemini_reply_text),
             parse_mode="MarkdownV2",
         )
     except:
@@ -293,7 +293,7 @@ def gemini_translate_to_english_handler(message: Message, bot: TeleBot) -> None:
     try:
         bot.reply_to(
             message,
-            "Gemini answer:\n" + escape(gemini_reply_text),
+            "Gemini answer:\n" + telegramify_markdown.convert(gemini_reply_text),
             parse_mode="MarkdownV2",
         )
     except:
