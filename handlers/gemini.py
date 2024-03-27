@@ -27,7 +27,6 @@ safety_settings = [
 ]
 
 # this prompt copy from https://twitter.com/dotey/status/1737627478007456183
-# great thanks to 宝玉
 translate_to_chinese_prompt = """
 你是一位精通简体中文的专业翻译，尤其擅长将专业学术论文翻译成浅显易懂的科普文章。请你帮我将以下英文段落翻译成中文，风格与中文科普读物相似。
 
@@ -83,7 +82,6 @@ translate_to_chinese_prompt = """
 """
 
 # this prompt copy from https://twitter.com/dotey/status/1737732732149457076
-# great thanks to 宝玉
 translate_to_english_prompt = """
 现在我要写一个将中文翻译成英文科研论文的GPT，请参照以下Prompt制作，注意都用英文生成：
 
@@ -220,90 +218,96 @@ def gemini_photo_handler(message: Message, bot: TeleBot) -> None:
 
 def gemini_translate_to_chinese_handler(message: Message, bot: TeleBot) -> None:
     """translate to Chinese with Gemini"""
-    reply_message = bot.reply_to(
-        message,
-        "Generating google gemini answer please wait...",
-    )
     m = message.text.strip()
     player = None
     player_id = (
         f"{message.chat.id}-{message.from_user.id}-{currentframe().f_code.co_name}"
     )
+    # restart will lose all TODO
     if player_id not in gemini_player_dict:
         player = make_new_gemini_convo()
         gemini_player_dict[player_id] = player
     else:
         player = gemini_player_dict[player_id]
+    if m.strip() == "clear":
+        bot.reply_to(
+            message,
+            "just clear you gemini messages history",
+        )
+        player.history.clear()
+        return
+
+    # keep the last 5, every has two ask and answer.
+    if len(player.history) > 10:
+        player.history = player.history[2:]
 
     try:
         player.send_message(f"{translate_to_chinese_prompt}\n{m}")
         gemini_reply_text = player.last.text.strip()
+        # Gemini is often using ':' in **Title** which not work in Telegram Markdown
+        gemini_reply_text = gemini_reply_text.replace(": **", "**\: ")
     except StopCandidateException as e:
         match = re.search(r'content\s*{\s*parts\s*{\s*text:\s*"([^"]+)"', str(e))
         if match:
             gemini_reply_text = match.group(1)
             gemini_reply_text = re.sub(r"\\n", "\n", gemini_reply_text)
         else:
-            raise e
+            print("No meaningful text was extracted from the exception.")
+            bot.reply_to(
+                message,
+                "Google gemini encountered an error while generating an answer. Please check the log.",
+            )
+            return
 
-    try:
-        bot.reply_to(
-            message,
-            "Gemini answer:\n" + telegramify_markdown.convert(gemini_reply_text),
-            parse_mode="MarkdownV2",
-        )
-    except:
-        print("wrong markdown format")
-        bot.reply_to(
-            message,
-            "Gemini answer:\n\n" + gemini_reply_text,
-        )
-    finally:
-        bot.delete_message(reply_message.chat.id, reply_message.message_id)
+    # By default markdown
+    bot_reply_markdown(message, "Gemini answer", gemini_reply_text, bot)
 
 
 def gemini_translate_to_english_handler(message: Message, bot: TeleBot) -> None:
     """translate to English with Gemini"""
-    reply_message = bot.reply_to(
-        message,
-        "Generating google gemini answer please wait...",
-    )
     m = message.text.strip()
     player = None
     player_id = (
         f"{message.chat.id}-{message.from_user.id}-{currentframe().f_code.co_name}"
     )
+    # restart will lose all TODO
     if player_id not in gemini_player_dict:
         player = make_new_gemini_convo()
         gemini_player_dict[player_id] = player
     else:
         player = gemini_player_dict[player_id]
+    if m.strip() == "clear":
+        bot.reply_to(
+            message,
+            "just clear you gemini messages history",
+        )
+        player.history.clear()
+        return
+
+    # keep the last 5, every has two ask and answer.
+    if len(player.history) > 10:
+        player.history = player.history[2:]
 
     try:
         player.send_message(f"{translate_to_english_prompt}\n{m}")
         gemini_reply_text = player.last.text.strip()
+        # Gemini is often using ':' in **Title** which not work in Telegram Markdown
+        gemini_reply_text = gemini_reply_text.replace(": **", "**\: ")
     except StopCandidateException as e:
         match = re.search(r'content\s*{\s*parts\s*{\s*text:\s*"([^"]+)"', str(e))
         if match:
             gemini_reply_text = match.group(1)
             gemini_reply_text = re.sub(r"\\n", "\n", gemini_reply_text)
         else:
-            raise e
+            print("No meaningful text was extracted from the exception.")
+            bot.reply_to(
+                message,
+                "Google gemini encountered an error while generating an answer. Please check the log.",
+            )
+            return
 
-    try:
-        bot.reply_to(
-            message,
-            "Gemini answer:\n" + telegramify_markdown.convert(gemini_reply_text),
-            parse_mode="MarkdownV2",
-        )
-    except:
-        print("wrong markdown format")
-        bot.reply_to(
-            message,
-            "Gemini answer:\n\n" + gemini_reply_text,
-        )
-    finally:
-        bot.delete_message(reply_message.chat.id, reply_message.message_id)
+    # By default markdown
+    bot_reply_markdown(message, "Gemini answer", gemini_reply_text, bot)
 
 
 def register(bot: TeleBot) -> None:
