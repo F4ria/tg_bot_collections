@@ -1,13 +1,20 @@
 from inspect import currentframe
 from os import environ
 import re
+import time
 
 import google.generativeai as genai
 from google.generativeai.types.generation_types import StopCandidateException
 from telebot import TeleBot
 from telebot.types import Message
 
-from . import bot_reply_markdown
+from telegramify_markdown import convert
+from telegramify_markdown.customize import markdown_symbol
+
+from . import *
+
+markdown_symbol.head_level_1 = "📌"  # If you want, Customizing the head level 1 symbol
+markdown_symbol.link = "🔗"  # If you want, Customizing the link symbol
 
 GOOGLE_GEMINI_KEY = environ.get("GOOGLE_GEMINI_KEY")
 
@@ -16,7 +23,7 @@ generation_config = {
     "temperature": 0.7,
     "top_p": 1,
     "top_k": 1,
-    "max_output_tokens": 4096,
+    "max_output_tokens": 8192,
 }
 
 safety_settings = [
@@ -130,11 +137,16 @@ translate_to_english_prompt = """
 
 # Global history cache
 gemini_player_dict = {}
+gemini_pro_player_dict = {}
 
 
-def make_new_gemini_convo():
+def make_new_gemini_convo(is_pro=False):
+    model_name = "models/gemini-1.0-pro-latest"
+    if is_pro:
+        model_name = "models/gemini-1.5-pro-latest"
+
     model = genai.GenerativeModel(
-        model_name="gemini-pro",
+        model_name=model_name,
         generation_config=generation_config,
         safety_settings=safety_settings,
     )
@@ -163,6 +175,9 @@ def gemini_handler(message: Message, bot: TeleBot) -> None:
         player.history.clear()
         return
 
+    # show something, make it more responsible
+    reply_id = bot_reply_first(message, "Gemini", bot)
+
     # keep the last 5, every has two ask and answer.
     if len(player.history) > 10:
         player.history = player.history[2:]
@@ -171,7 +186,8 @@ def gemini_handler(message: Message, bot: TeleBot) -> None:
         player.send_message(m)
         gemini_reply_text = player.last.text.strip()
         # Gemini is often using ':' in **Title** which not work in Telegram Markdown
-        gemini_reply_text = gemini_reply_text.replace(": **", "**\: ")
+        gemini_reply_text = gemini_reply_text.replace(":**", "\:**")
+        gemini_reply_text = gemini_reply_text.replace("：**", "**\: ")
     except StopCandidateException as e:
         match = re.search(r'content\s*{\s*parts\s*{\s*text:\s*"([^"]+)"', str(e))
         if match:
@@ -186,7 +202,76 @@ def gemini_handler(message: Message, bot: TeleBot) -> None:
             return
 
     # By default markdown
-    bot_reply_markdown(message, "Gemini answer", gemini_reply_text, bot)
+    bot_reply_markdown(reply_id, "Gemini", gemini_reply_text, bot)
+
+
+def gemini_pro_handler(message: Message, bot: TeleBot) -> None:
+    """Gemini : /gemini_pro <question>"""
+    m = message.text.strip()
+    player = None
+    # restart will lose all TODO
+    if str(message.from_user.id) not in gemini_pro_player_dict:
+        player = make_new_gemini_convo(is_pro=True)
+        gemini_pro_player_dict[str(message.from_user.id)] = player
+    else:
+        player = gemini_pro_player_dict[str(message.from_user.id)]
+    if m.strip() == "clear":
+        bot.reply_to(
+            message,
+            "just clear you gemini messages history",
+        )
+        player.history.clear()
+        return
+
+    # show something, make it more responsible
+    reply_id = bot_reply_first(message, "Geminipro", bot)
+
+    # keep the last 5, every has two ask and answer.
+    if len(player.history) > 10:
+        player.history = player.history[2:]
+
+    try:
+        r = player.send_message(m, stream=True)
+        s = ""
+        start = time.time()
+        for e in r:
+            s += e.text
+            print(s)
+            if time.time() - start > 1.7:
+                start = time.time()
+                try:
+                    # maybe the same message
+                    if not reply_id:
+                        continue
+                    bot.edit_message_text(
+                        message_id=reply_id.message_id,
+                        chat_id=reply_id.chat.id,
+                        text=convert(s),
+                        parse_mode="MarkdownV2",
+                    )
+                except Exception as e:
+                    print(str(e))
+        try:
+            # maybe not complete
+            # maybe the same message
+            bot.edit_message_text(
+                message_id=reply_id.message_id,
+                chat_id=reply_id.chat.id,
+                text=convert(s),
+                parse_mode="MarkdownV2",
+            )
+        except Exception as e:
+            player.history.clear()
+            print(str(e))
+            return
+    except:
+        bot.reply_to(
+            message,
+            "claude answer:\n" + "geminipro answer timeout",
+            parse_mode="MarkdownV2",
+        )
+        player.history.clear()
+        return
 
 
 def gemini_photo_handler(message: Message, bot: TeleBot) -> None:
@@ -324,6 +409,12 @@ def register(bot: TeleBot) -> None:
     )
     bot.register_message_handler(
         gemini_translate_to_english_handler, regexp="^t2eng:", pass_bot=True
+    )
+    bot.register_message_handler(
+        gemini_pro_handler, commands=["gemini_pro"], pass_bot=True
+    )
+    bot.register_message_handler(
+        gemini_pro_handler, regexp="^gemini_pro:", pass_bot=True
     )
     bot.register_message_handler(
         gemini_photo_handler,
